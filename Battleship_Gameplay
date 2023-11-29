@@ -1,0 +1,222 @@
+class Cell:
+    def __init__(self, r, c):
+        self.row = r
+        self.col = c
+        self.mark = '0'  
+
+    def get_mark(self):
+        return self.mark
+
+
+class Ship:
+    def __init__(self, length):
+        self.length = length
+        self.cells = []
+
+    def is_sunk(self):
+        return all(cell.get_mark() == 'X' for cell in self.cells)
+
+    def sink(self):
+        for cell in self.cells:
+            cell.mark = 'X'
+
+
+class Board:
+    BOARD_SIZE = 6
+
+    def __init__(self):
+        self.cells = [Cell(r, c) for r in range(self.BOARD_SIZE) for c in range(self.BOARD_SIZE)]
+        self.ships = []
+
+    def print_board(self, hidden=False):
+        print("\n   1 2 3 4 5 6")
+        for row in range(self.BOARD_SIZE):
+            print(row + 1, end=" ")
+            for col in range(self.BOARD_SIZE):
+                cell = self.cells[row * self.BOARD_SIZE + col]
+                if hidden and cell.get_mark() == 'X':
+                    print("0", end=" ")
+                else:
+                    print(cell.get_mark(), end=" ")
+            print()
+
+    def print_board_with_hits_and_misses(self, hidden=False):
+        print("\n   1 2 3 4 5 6")
+        for i in range(self.BOARD_SIZE):
+            print(i + 1, end=" ")
+            for j in range(self.BOARD_SIZE):
+                cell = self.cells[i * self.BOARD_SIZE + j]
+                mark = cell.get_mark() if not hidden or cell.get_mark() == 'T' or cell.get_mark() == 'X' else '0'
+                print(mark, end=" ")
+            print()
+
+    def is_valid_position(self, ship, start_row, start_col, direction):
+        for i in range(ship.length):
+            row = start_row
+            col = start_col
+            if direction == 'h':
+                col += i
+            elif direction == 'v':
+                row += i
+
+            if not (0 <= row < self.BOARD_SIZE and 0 <= col < self.BOARD_SIZE):
+                return False  
+
+            if self.cells[row * self.BOARD_SIZE + col].get_mark() in {'■', 'S'}:
+                return False  
+
+            for r in range(max(0, row - 1), min(self.BOARD_SIZE, row + 2)):
+                for c in range(max(0, col - 1), min(self.BOARD_SIZE, col + 2)):
+                    if self.cells[r * self.BOARD_SIZE + c].get_mark() == '■':
+                        return False
+
+        return True
+
+    def put_ship(self, ship, start_row, start_col, direction):
+        if self.is_valid_position(ship, start_row, start_col, direction):
+            for i in range(ship.length):
+                row = start_row
+                col = start_col
+                if direction == 'h':
+                    col += i
+                elif direction == 'v':
+                    row += i
+
+                self.cells[row * self.BOARD_SIZE + col].mark = '■'
+                ship.cells.append(self.cells[row * self.BOARD_SIZE + col])
+
+            self.ships.append(ship)
+            return True
+        return False
+
+    def place_ships_manually(self):
+        print("Установите корабли:")
+        for length in [3, 2, 2, 1, 1, 1]:
+            while True:
+                self.print_board()
+                try:
+                    print(f"Установите корабль длины {length}:")
+                    start_row = int(input("Введите начальную строку (1-6): ")) - 1
+                    start_col = int(input("Введите начальную колонку (1-6): ")) - 1
+                    direction = input("Введите направление (h - горизонтально, v - вертикально): ")
+                    if direction not in {'h', 'v'}:
+                        raise ValueError("Некорректное направление. Введите 'h' или 'v'.")
+
+                    ship = Ship(length)
+                    if self.put_ship(ship, start_row, start_col, direction):
+                        break
+                    else:
+                        print("Некорректные координаты. Попробуйте еще раз.")
+                except ValueError:
+                    print("Ошибка ввода. Пожалуйста, введите корректные данные.")
+
+    def place_ships_randomly(self):
+        import random
+        for length in [3, 2, 2, 1, 1, 1]:
+            while True:
+                start_row = random.randint(0, self.BOARD_SIZE - 1)
+                start_col = random.randint(0, self.BOARD_SIZE - 1)
+                direction = random.choice(['h', 'v'])
+
+                ship = Ship(length)
+                if self.put_ship(ship, start_row, start_col, direction):
+                    break
+
+    def receive_hit(self, row, col):
+        cell = self.cells[row * self.BOARD_SIZE + col]
+        if cell.get_mark() == '■':
+            cell.mark = 'X'
+            ship = next((ship for ship in self.ships if cell in ship.cells), None)
+            if ship and ship.is_sunk():
+                ship.sink()
+                return "Вы потопили корабль противника!"
+            return "Вы попали в корабль противника!"
+        else:
+            cell.mark = 'T'
+            return "Мимо! Ни одного корабля противника в этой клетке."
+
+    def all_ships_sunk(self):
+        return all(ship.is_sunk() for ship in self.ships)
+
+
+class BattleshipGame:
+    def __init__(self):
+        self.player_board = Board()
+        self.computer_board = Board()
+        self.is_player_turn = True  
+        self.used_computer_moves = set()  
+
+    def print_boards(self, player_turn_result=None, computer_turn_result=None):
+        print("\nВаше поле:")
+        self.player_board.print_board_with_hits_and_misses()
+
+        if player_turn_result is not None:
+            print(f"\nВаш ход: {player_turn_result}")
+
+        print("\nПоле компьютера:")
+
+        if computer_turn_result is not None:
+            print(f"\nХод компьютера: {computer_turn_result}")
+
+        self.computer_board.print_board_with_hits_and_misses(hidden=True)
+
+    def play_game(self):
+        print("Добро пожаловать в игру Морской бой!")
+        self.player_board.place_ships_manually()
+        self.computer_board.place_ships_randomly()
+
+        while True:
+            self.print_boards()
+
+            if self.is_player_turn:
+                player_turn_result = self.player_turn()
+                if self.computer_board.all_ships_sunk():
+                    print("Вы победили! Поздравляем!")
+                    break
+                self.print_boards(player_turn_result=player_turn_result)
+            else:
+                computer_turn_result = self.computer_turn()
+                if self.player_board.all_ships_sunk():
+                    print("Компьютер победил. Попробуйте еще раз!")
+                    break
+                self.print_boards(computer_turn_result=computer_turn_result)
+
+    def player_turn(self):
+        while True:
+            try:
+                row = int(input("Введите номер строки (1-6): ")) - 1
+                col = int(input("Введите номер колонки (1-6): ")) - 1
+
+                if not (0 <= row < Board.BOARD_SIZE and 0 <= col < Board.BOARD_SIZE):
+                    raise ValueError("Координаты выходят за границы поля.")
+
+                if self.computer_board.cells[row * Board.BOARD_SIZE + col].get_mark() in {'T', 'X'}:
+                    raise ValueError("На эту клетку уже стреляли. Выберите другую.")
+
+                result = self.computer_board.receive_hit(row, col)
+                if result.startswith("Мимо"):
+                    self.is_player_turn = not self.is_player_turn  
+                return result
+            except ValueError as e:
+                print(f"Ошибка ввода: {e}. Попробуйте еще раз.")
+
+    def computer_turn(self):
+        import random
+        while True:
+            row = random.randint(0, Board.BOARD_SIZE - 1)
+            col = random.randint(0, Board.BOARD_SIZE - 1)
+
+            if (row, col) in self.used_computer_moves:
+                continue  
+
+            self.used_computer_moves.add((row, col))
+
+            result = self.player_board.receive_hit(row, col)
+            if result.startswith("Мимо"):
+                self.is_player_turn = not self.is_player_turn  
+            return result
+
+
+if __name__ == "__main__":
+    game = BattleshipGame()
+    game.play_game()
